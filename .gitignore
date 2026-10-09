@@ -1,0 +1,10 @@
+build/
+__pycache__/
+*.pyc
+*.fs
+*.log
+fw/*.o
+fw/*.d
+fw/*.elf
+fw/*.bin
+fw/*.map
