@@ -1,11 +1,11 @@
 /* can.c -- see can.h */
 #include "can.h"
 
-#define CAN_FIFO_DEPTH 4   /* fifo_depth in canlite.py */
+#define CAN_FIFO_DEPTH 2   /* fifo_depth in canlite.py */
 
 int can_rx_pending(void) { return CSR_FIELD_GET(can_status_read(), CSR_CAN_STATUS_RX_LEVEL); }
 int can_tx_free(void)    { return CAN_FIFO_DEPTH - CSR_FIELD_GET(can_status_read(), CSR_CAN_STATUS_TX_LEVEL); }
-int can_state(void)      { return CSR_FIELD_GET(can_status_read(), CSR_CAN_STATUS_STATE); }
+int can_state(void)      { return CSR_FIELD_GET(can_status_read(), CSR_CAN_STATUS_BUS_STATE); }
 uint32_t can_time_us(void) { return can_timestamp_read(); }
 
 int can_send(const can_frame_t *f)
@@ -22,7 +22,7 @@ int can_send(const can_frame_t *f)
                       ((uint32_t)(f->ide & 1) << CSR_CAN_TX_CTRL_IDE_OFFSET) |
                       ((uint32_t)(f->dlc & 15) << CSR_CAN_TX_CTRL_DLC_OFFSET));
     can_tx_data_write(data);
-    can_cmd_write(1u << CSR_CAN_CMD_TX_PUSH_OFFSET);   /* pulse: push into TX FIFO */
+    can_command_write(1u << CSR_CAN_COMMAND_TX_PUSH_OFFSET);   /* pulse: push into TX FIFO */
     return 0;
 }
 
@@ -42,6 +42,6 @@ int can_recv(can_frame_t *f)
         f->data[i] = (uint8_t)(data >> (8 * i));
     f->ts  = can_rx_ts_read();
 
-    can_cmd_write(1u << CSR_CAN_CMD_RX_POP_OFFSET);    /* pulse: drop it from the RX FIFO */
+    can_command_write(1u << CSR_CAN_COMMAND_RX_POP_OFFSET);    /* pulse: drop it from the RX FIFO */
     return 1;
 }

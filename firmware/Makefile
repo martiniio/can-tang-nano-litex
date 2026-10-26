@@ -13,7 +13,7 @@ include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
 TARGET  = firmware
-OBJECTS = crt0.o main.o can.o          # crt0.o = M3 startup (vector table, stack, .data/.bss)
+OBJECTS = crt0.o main.o capture.o         # crt0.o = M3 startup (vector table, stack, .data/.bss)
 
 all: $(TARGET).bin size
 
