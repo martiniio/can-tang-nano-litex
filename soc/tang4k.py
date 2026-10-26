@@ -6,7 +6,8 @@
 # Copyright (c) 2021 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Tang Nano 4K: Gowin EMCU (Cortex-M3) + CanLite (CAN) + optional OV2640 DVP camera.
+# Tang Nano 4K: Gowin EMCU (Cortex-M3) + optional camera (OV2640 -> DVPFrontEnd -> Capture)
+# + optional CanLite (CAN).
 # HyperRAM / HDMI video were removed: the M3 cannot reach HyperRAM through the EMCU's
 # 64 KB fabric window, and nothing here uses HDMI.
 
@@ -25,9 +26,8 @@ from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
 
 from cansoc.canlite import CanLite
-from cansoc.dvp_camera import DVPCamera
 from cansoc.dvp_frontend import DVPFrontEnd
-from cansoc.vision import Vision
+from cansoc.capture import Capture
 
 # CAN bit timing ----------------------------------------------------------------------------------
 # CanLite: bit = 2 * BRP * (1 + TSEG1 + TSEG2) clocks. With TSEG1=6, TSEG2=2 (9 tq, sample point
@@ -68,10 +68,6 @@ class BaseSoC(SoCCore):
         with_camera     = False,
         cam_width       = 800,
         cam_height      = 600,
-        cam_rows        = 10,
-        cam_format      = "yuv",
-        cam_ip          = "strip",
-        with_vision     = False,
         with_can        = False,
         **kwargs):
         platform = sipeed_tang_nano_4k.Platform(toolchain=toolchain)
@@ -132,29 +128,16 @@ class BaseSoC(SoCCore):
                 fifo_depth=2)
         self.comb += platform.request("flash_cs_n").eq(1)   # keep onboard flash deselected (pins 1/48)
 
-        # OV2640 DVP camera ------------------------------------------------------------------------
-        # cam_ip = "strip"    : strip capture into a BSRAM buffer (DVPCamera, CSRs cam_*)
-        #          "frontend" : DVPFrontEnd only -> pixel stream at sys (CSRs fe_*), no buffer yet
+        # Camera: OV2640 -> DVPFrontEnd (pixel stream, CSRs fe_*) -> Capture (CSRs cap_*) ----------
         if with_camera:
             gw_dir = os.path.join("build", "sipeed_tang_nano_4k", "gateware")
-            if cam_ip == "strip":
-                self.cam = DVPCamera(platform, platform.request("dvp_camera"),
-                    width=cam_width, height=cam_height, rows=cam_rows, fmt=cam_format,
-                    sys_clk_freq=sys_clk_freq, xclk_freq=13.5e6, gateware_dir=gw_dir)
-            else:
-                self.fe = DVPFrontEnd(platform, platform.request("dvp_camera"),
-                    width=cam_width, height=cam_height,
-                    sys_clk_freq=sys_clk_freq, xclk_freq=13.5e6, gateware_dir=gw_dir)
-                # Vision (watch + snitch) on the front-end's pixel stream (CSRs vis_*)
-                if with_vision:
-                    self.vis = Vision(platform, self.fe.source,
-                        width=cam_width, height=cam_height, gateware_dir=gw_dir)
-                    for name, value in self.vis.constants.items():   # sizes -> soc.h
-                        self.add_constant(name, value)
-            self.add_constant("CAM_WIDTH",  cam_width)
-            self.add_constant("CAM_HEIGHT", cam_height)
-            self.add_constant("CAM_ROWS",   cam_rows)
-            self.add_constant("CAM_YUV",    int(cam_format == "yuv"))
+            self.fe = DVPFrontEnd(platform, platform.request("dvp_camera"),
+                width=cam_width, height=cam_height,
+                sys_clk_freq=sys_clk_freq, xclk_freq=13.5e6, gateware_dir=gw_dir)
+            self.cap = Capture(platform, self.fe.source,
+                width=cam_width, height=cam_height, gateware_dir=gw_dir)
+            for name, value in self.cap.constants.items():   # sizes -> soc.h
+                self.add_constant(name, value)
 
 # Gowin IDE fix ------------------------------------------------------------------------------------
 # LiteX leaves the boot-flash data (FLASH256K.DOUT -> EMCU.TARGFLASH0HRDATA) unconnected because
@@ -177,14 +160,10 @@ def main():
     parser.add_target_argument("--flash",        action="store_true",      help="Flash bitstream and BIOS.")
     parser.add_target_argument("--prog-kit",     default="openfpgaloader", help="Programmer select from Gowin/openFPGALoader.")
     parser.add_target_argument("--sys-clk-freq", default=54e6, type=float, help="System clock frequency.")
-    parser.add_target_argument("--with-camera",  action="store_true",      help="Add the OV2640 DVP camera.")
-    parser.add_target_argument("--cam-width",    default=800, type=int,    help="Camera width  (multiple of 4, <= 800).")
-    parser.add_target_argument("--cam-height",   default=600, type=int,    help="Camera height (multiple of 4, <= 600).")
-    parser.add_target_argument("--cam-rows",     default=10,  type=int,    help="Rows per strip (buffer = width*rows bytes).")
-    parser.add_target_argument("--cam-format",   default="yuv", choices=["yuv", "raw"], help="yuv = greyscale Y, raw = Bayer.")
     parser.add_target_argument("--with-can",     action="store_true",      help="Add the CanLite CAN controller.")
-    parser.add_target_argument("--with-vision",  action="store_true",      help="Add Vision (watch + snitch); needs --cam-ip frontend.")
-    parser.add_target_argument("--cam-ip",       default="strip", choices=["strip", "frontend"], help="strip = DVPCamera, frontend = DVPFrontEnd stream.")
+    parser.add_target_argument("--with-camera",  action="store_true",      help="Add the camera: OV2640 + DVPFrontEnd + Capture.")
+    parser.add_target_argument("--cam-width",    default=800, type=int,    help="Picture width  (multiple of 4, <= 800).")
+    parser.add_target_argument("--cam-height",   default=600, type=int,    help="Picture height (multiple of 4, <= 600).")
     # Resource-saving defaults (the device is full): no SoC controller (reset/scratch/bus_errors
     # registers, unused by the firmware) and a 4-deep UART FIFO instead of 16.
     parser.set_defaults(no_ctrl=True, uart_fifo_depth=4)
@@ -196,10 +175,6 @@ def main():
         with_camera  = args.with_camera,
         cam_width    = args.cam_width,
         cam_height   = args.cam_height,
-        cam_rows     = args.cam_rows,
-        cam_format   = args.cam_format,
-        cam_ip       = args.cam_ip,
-        with_vision  = args.with_vision,
         with_can     = args.with_can,
         **parser.soc_argdict
     )

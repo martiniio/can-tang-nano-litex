@@ -29,20 +29,35 @@ _io = [
     ("user_btn_n", 0, Pins("14"), IOStandard("LVCMOS18")),
     ("user_btn_n", 1, Pins("15"), IOStandard("LVCMOS18")),
 
-    # Serial (FIXME: For tests, change or remove.)
+    # Serial -- moved off the DVP connector (was 39/40)
     ("serial", 0,
-        Subsignal("rx", Pins("40"),Misc("PULL_MODE=UP")), # 
-        Subsignal("tx", Pins("39")), #
+        Subsignal("rx", Pins("9"), Misc("PULL_MODE=UP")),
+        Subsignal("tx", Pins("8")),
         IOStandard("LVCMOS33")
     ),
-
     # CAN (SN65HVD230)
     ("can", 0,
-        Subsignal("tx", Pins("41")),
-        Subsignal("rx", Pins("42"), Misc("PULL_MODE=UP")),
+        Subsignal("tx", Pins("48")),
+        Subsignal("rx", Pins("1"), Misc("PULL_MODE=UP")),
         IOStandard("LVCMOS33")
     ),
 
+    # Onboard SPI flash CS, held high so CAN on pin 1 can't clock the flash
+    ("flash_cs_n", 0, Pins("2"), IOStandard("LVCMOS33")),
+    # OV2640 DVP camera connector -- pins from Sipeed camera_hdmi/src/dk_video.cst
+    ("dvp_camera", 0,
+        Subsignal("xclk",  Pins("33"), IOStandard("LVCMOS25"), Misc("DRIVE=8")),
+        Subsignal("scl",   Pins("44"), IOStandard("LVCMOS33"), Misc("DRIVE=8")),
+        Subsignal("sda",   Pins("46"), IOStandard("LVCMOS33"), Misc("DRIVE=8")),
+        Subsignal("pclk",  Pins("41"), IOStandard("LVCMOS33"), Misc("PULL_MODE=UP")),
+        Subsignal("href",  Pins("42"), IOStandard("LVCMOS33"), Misc("PULL_MODE=UP")),
+        Subsignal("vsync", Pins("43"), IOStandard("LVCMOS33"), Misc("PULL_MODE=UP")),
+        #                      D0 D1 D2 D3 D4 D5 D6 D7  (bank 3, 1.8 V)
+        Subsignal("data_lo", Pins("22 21 17 19 20 18 16 23"), IOStandard("LVCMOS18"), Misc("PULL_MODE=UP")),
+        #                      D8 D9                    (bank 1, 3.3 V)
+        Subsignal("data_hi", Pins("39 40"), IOStandard("LVCMOS33"), Misc("PULL_MODE=UP")),
+    ),
+    # SPIFlash
     # SPIFlash
     ("spiflash", 0,
         Subsignal("cs_n", Pins("2"),  IOStandard("LVCMOS33")),
