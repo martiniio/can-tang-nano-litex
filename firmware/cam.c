@@ -1,4 +1,4 @@
-/* cam.c -- OV2640 strip capture driver. Register meaning: see cansoc/dvp_camera.py. */
+/* cam.c -- OV2640 strip capture driver. Register meaning: see cores/dvp_camera.py. */
 #include <generated/csr.h>
 #include <system.h>           /* busy_wait_us (timer0) */
 #include "cam.h"

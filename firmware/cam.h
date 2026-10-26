@@ -1,4 +1,4 @@
-/* cam.h -- OV2640 strip capture (cansoc/dvp_camera.py). Needs a --with-camera SoC build. */
+/* cam.h -- OV2640 strip capture (cores/dvp_camera.py). Needs a --with-camera SoC build. */
 #ifndef CAM_H
 #define CAM_H
 

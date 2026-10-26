@@ -1,4 +1,4 @@
-/* vision.h -- M3 driver for the Vision IP (cansoc/vision.py): Snitch now, Watch later.
+/* vision.h -- M3 driver for the Vision IP (cores/vision.py): Snitch now, Watch later.
  *
  * The fabric does the work; this is only the vocabulary to talk to it. Nothing here knows
  * about the UART or any other link: packets are read into memory and the caller decides
