@@ -1,3 +1,6 @@
 [submodule "rtl/third_party/can-lite-vhdl"]
 	path = rtl/third_party/can-lite-vhdl
 	url = https://github.com/bggardner/can-lite-vhdl
+[submodule "rtl/third_party/TangNano-4K-example"]
+	path = rtl/third_party/TangNano-4K-example
+	url = https://github.com/sipeed/TangNano-4K-example

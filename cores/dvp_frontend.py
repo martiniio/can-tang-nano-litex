@@ -52,8 +52,8 @@ from migen.genlib.fifo import AsyncFIFO
 from litex.gen import LiteXModule
 from litex.soc.interconnect.csr import CSRStatus, CSRField
 
-RTL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rtl", "ov2640")
-
+RTL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rtl", "third_party",
+                       "TangNano-4K-example", "camera_hdmi", "src", "ov2640")
 # Pixel stream layout (sys domain), shared with Capture.
 STREAM_LAYOUT = [
     ("valid",     1),

@@ -25,9 +25,9 @@ from litex.soc.integration.soc import SoCRegion
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
 
-from cansoc.canlite import CanLite
-from cansoc.dvp_frontend import DVPFrontEnd
-from cansoc.capture import Capture
+from cores.canlite import CanLite
+from cores.dvp_frontend import DVPFrontEnd
+from cores.capture import Capture
 
 # CAN bit timing ----------------------------------------------------------------------------------
 # CanLite: bit = 2 * BRP * (1 + TSEG1 + TSEG2) clocks. With TSEG1=6, TSEG2=2 (9 tq, sample point
