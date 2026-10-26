@@ -13,7 +13,19 @@ include $(BUILD_DIR)/software/include/generated/variables.mak
 include $(SOC_DIRECTORY)/software/common.mak
 
 TARGET  = firmware
-OBJECTS = crt0.o main.o capture.o         # crt0.o = M3 startup (vector table, stack, .data/.bss)
+
+# Application, chosen at compile time (the SoC must be built with --with-camera --with-can):
+#   make            camera picture test (main.c, APP_CAMERA)
+#   make APP=can    CAN echo test       (main.c, APP_CAN)
+# Run `make clean` when switching APP (make does not track the -D flag).
+APP ?= camera
+ifeq ($(APP),can)
+OBJECTS = crt0.o main.o can.o             # crt0.o = M3 startup (vector table, stack, .data/.bss)
+CFLAGS += -DAPP_CAN
+else
+OBJECTS = crt0.o main.o capture.o
+CFLAGS += -DAPP_CAMERA
+endif
 
 all: $(TARGET).bin size
 

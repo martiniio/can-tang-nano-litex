@@ -1,33 +1,112 @@
-/* main.c -- camera node: on request, one full 800x600 greyscale picture over the UART.
- * SoC: python3 -m soc.tang4k --cpu-type=gowin_emcu --with-camera
- *                            --uart-baudrate 3000000 --build --no-compile-gateware
- * Objects: crt0.o main.o capture.o
- * Receiver: tools/node_mon.py (Luckfox)
- *
- * UART output (text lines, except the binary block of a picture):
- *   every 1 s     "cam t=..s f=FRAME fps=.. cfg=.."
- *                 t    time since boot          f    frame_id of the camera stream
- *                 fps  frames in the last second
- *                 cfg  sensor configured (SCCB table sent)
- *   a picture     "PIC picture=N rows=600 bytes=812"
- *                 600 binary row packets of 812 bytes (layout: capture.h), PIC_GAP_US apart
- *                 "PIC_END picture=N frames=a..b"
- *   keys          s = send a picture
- *                 t = drain test: take a picture but only read it (no UART), print
- *                     "drain: picture=N rows=.. frames=a..b": how fast fabric + M3 alone are
- *
- * The CRC is made by the fabric and checked by the receiver (end to end); the M3 only forwards.
- */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <generated/csr.h>
 #include <generated/soc.h>
 #include <libbase/uart.h>
 #include <system.h>
+
+#if defined(APP_CAN)
+
+/* ============================================================================== APP_CAN === */
+#include "can.h"
+
+#define REPORT_US 1000000u
+
+static uint32_t n_rx, n_tx, n_bad, n_rtr, n_self;
+
+/* The last few echoes we queued: a received frame equal to one of them is our own. */
+#define SENT_N 4
+static can_frame_t sent[SENT_N];
+static unsigned sent_pos;
+
+static int same(const can_frame_t *a, const can_frame_t *b)
+{
+    if (a->id != b->id || a->ide != b->ide || a->dlc != b->dlc)
+        return 0;
+    for (int i = 0; i < a->dlc && i < 8; i++)
+        if (a->data[i] != b->data[i])
+            return 0;
+    return 1;
+}
+
+static int is_own(const can_frame_t *f)
+{
+    for (int i = 0; i < SENT_N; i++)
+        if (sent[i].dlc != 0xff && same(f, &sent[i]))
+            return 1;
+    return 0;
+}
+
+static int pattern_ok(const can_frame_t *f)       /* canfdtest: data[i] = data[0] + i */
+{
+    for (int i = 1; i < f->dlc && i < 8; i++)
+        if ((uint8_t)(f->data[i] - f->data[i - 1]) != 1)
+            return 0;
+    return 1;
+}
+
+static void echo(can_frame_t *f)
+{
+    f->id = (f->id + 1) & (f->ide ? 0x1FFFFFFFu : 0x7FFu);
+    for (int i = 0; i < f->dlc && i < 8; i++)
+        f->data[i]++;
+    while (can_send(f) != 0)                       /* TX FIFO full: wait for the bus */
+        if (can_state() == CAN_BUS_OFF)
+            return;                                /* gives up; shows up as missing echo */
+    sent[sent_pos] = *f;
+    sent_pos = (sent_pos + 1) % SENT_N;
+    n_tx++;
+}
+
+int main(void)
+{
+    uart_init();
+    printf("\n== Tang Nano 4K CAN echo (canfdtest DUT), 500 kbit/s classic CAN | z = zero counters ==\n");
+
+    can_frame_t f;
+    uint32_t t_last = can_time_us(), t_s = 0;
+    for (int i = 0; i < SENT_N; i++)
+        sent[i].dlc = 0xff;                        /* empty */
+
+    for (;;) {
+        if (can_recv(&f)) {
+            n_rx++;
+            if (f.rtr) {
+                n_rtr++;
+            } else if (is_own(&f)) {
+                n_self++;
+            } else {
+                if (!pattern_ok(&f))
+                    n_bad++;
+                echo(&f);
+            }
+        }
+
+        if (can_time_us() - t_last >= REPORT_US) {
+            t_last += REPORT_US;
+            t_s++;
+            printf("can t=%lus rx=%lu tx=%lu bad=%lu rtr=%lu self=%lu lost_rx=%lu lost_tx=%lu state=%d\n",
+                   (unsigned long)t_s, (unsigned long)n_rx, (unsigned long)n_tx,
+                   (unsigned long)n_bad, (unsigned long)n_rtr, (unsigned long)n_self,
+                   (unsigned long)can_rx_dropped_read(), (unsigned long)can_tx_dropped_read(),
+                   can_state());
+        }
+
+        if (uart_read_nonblock() && uart_read() == 'z') {
+            n_rx = n_tx = n_bad = n_rtr = n_self = 0;
+            printf("can: counters zeroed (hardware lost_* counters keep counting)\n");
+        }
+    }
+}
+
+#else
+
+/* =========================================================================== APP_CAMERA === */
 #include "capture.h"
 
 #define STATUS_MS   1000
-#define PIC_GAP_US  500        /* line idle after each packet: the Luckfox UART driver needs it */
+#define PIC_GAP_US  250        /* line idle after each packet: the Luckfox UART driver needs it */
 
 static capture_packet_t pkt;
 
@@ -111,3 +190,5 @@ int main(void)
         }
     }
 }
+
+#endif

@@ -1,4 +1,4 @@
-/* capture.h -- M3 driver for Capture (cansoc/capture.py): read a full picture at your own pace.
+/* capture.h -- M3 driver for Capture (cores/capture.py): read a full picture at your own pace.
  *
  * The fabric does the work; this is only the vocabulary to talk to it. Nothing here knows about
  * the UART or any other link: packets are read into memory and the caller decides where they go.
